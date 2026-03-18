@@ -1,0 +1,98 @@
+/* ─── RESET ─────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ─── DESIGN TOKENS ──────────────────────────────────────────────────────── */
+:root {
+  /* Palette — warm industrial slate */
+  --bg:           #F5F3EE;
+  --bg-2:         #EDEAE3;
+  --surface:      #FFFFFF;
+  --surface-2:    #F9F7F4;
+  --border:       #D8D3C8;
+  --border-strong:#B8B0A0;
+
+  /* Ink */
+  --ink-1:        #1A1714;
+  --ink-2:        #4A4540;
+  --ink-3:        #8C857A;
+  --ink-4:        #B8B0A0;
+
+  /* Accent — burnt sienna */
+  --accent:       #C4622D;
+  --accent-light: #E8855A;
+  --accent-bg:    #FDF0EB;
+  --accent-border:#F0C4B0;
+
+  /* Semantic */
+  --green:        #2E7D52;
+  --green-bg:     #EAF4EE;
+  --red:          #C23B3B;
+  --red-bg:       #FDEAEA;
+  --amber:        #B07820;
+  --amber-bg:     #FDF5E6;
+
+  /* Type */
+  --font-display: 'Syne', sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
+
+  /* Layout */
+  --sidebar-w:    240px;
+  --radius:       10px;
+  --radius-lg:    14px;
+  --shadow-sm:    0 1px 3px rgba(26,23,20,0.08), 0 1px 2px rgba(26,23,20,0.06);
+  --shadow-md:    0 4px 12px rgba(26,23,20,0.10), 0 2px 6px rgba(26,23,20,0.06);
+  --shadow-lg:    0 12px 40px rgba(26,23,20,0.14), 0 4px 16px rgba(26,23,20,0.08);
+}
+
+/* ─── BASE ───────────────────────────────────────────────────────────────── */
+html, body, #root {
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink-1);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── SCROLLBAR ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
+
+/* ─── ANIMATIONS ─────────────────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ─── UTILITY ────────────────────────────────────────────────────────────── */
+.fade-up   { animation: fadeUp   0.3s ease both; }
+.fade-in   { animation: fadeIn   0.25s ease both; }
+.scale-in  { animation: scaleIn  0.2s ease both; }
+
+input[type="time"]::-webkit-calendar-picker-indicator {
+  opacity: 0.4;
+  cursor: pointer;
+}
