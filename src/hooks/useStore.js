@@ -7,6 +7,7 @@ const DEFAULT = {
   employees: [],
   staffing: { ...DEFAULT_STAFFING },
   schedules: {}, // { [weekISO]: { [cellKey]: { employeeId, positionLabel } } }
+  preferences: {}, // { [weekISO]: { [empId]: ["Sunday__morning", ...] } }
 };
 
 function load() {
@@ -114,6 +115,20 @@ export function useStore() {
     });
   }, [setData]);
 
+  // ── PREFERENCES ────────────────────────────────────────────────────────
+  const setEmployeePreferences = useCallback((weekISO, empId, blockedShifts) => {
+    setData((d) => ({
+      ...d,
+      preferences: {
+        ...d.preferences,
+        [weekISO]: {
+          ...(d.preferences[weekISO] || {}),
+          [empId]: blockedShifts,
+        },
+      },
+    }));
+  }, [setData]);
+
   // ── STAFFING ───────────────────────────────────────────────────────────
   const saveStaffing = useCallback((staffing) => {
     setData((d) => ({ ...d, staffing }));
@@ -156,8 +171,9 @@ export function useStore() {
           const parsed = JSON.parse(e.target.result);
           if (!parsed.employees || !parsed.schedules)
             throw new Error('Invalid format');
-          // Ensure staffing exists
+          // Ensure staffing and preferences exist
           if (!parsed.staffing) parsed.staffing = { ...DEFAULT_STAFFING };
+          if (!parsed.preferences) parsed.preferences = {};
           setData(parsed);
           resolve();
         } catch (err) {
@@ -177,6 +193,7 @@ export function useStore() {
     updateEmployee,
     deleteEmployee,
     deleteAllEmployees,
+    setEmployeePreferences,
     saveStaffing,
     setSchedule,
     assignCell,
