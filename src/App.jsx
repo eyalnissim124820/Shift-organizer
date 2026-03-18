@@ -70,6 +70,7 @@ export default function App() {
                   addEmployeesBatch={store.addEmployeesBatch}
                   updateEmployee={store.updateEmployee}
                   deleteEmployee={store.deleteEmployee}
+                  deleteAllEmployees={store.deleteAllEmployees}
                   toast={toast}
                 />
               }

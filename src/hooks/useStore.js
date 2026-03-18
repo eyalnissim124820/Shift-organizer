@@ -100,6 +100,20 @@ export function useStore() {
     });
   }, [setData]);
 
+  const deleteAllEmployees = useCallback(() => {
+    setData((d) => {
+      const schedules = Object.fromEntries(
+        Object.entries(d.schedules).map(([wk, sched]) => [
+          wk,
+          Object.fromEntries(
+            Object.entries(sched).map(([k, v]) => [k, { ...v, employeeId: null }])
+          ),
+        ])
+      );
+      return { ...d, employees: [], schedules };
+    });
+  }, [setData]);
+
   // ── STAFFING ───────────────────────────────────────────────────────────
   const saveStaffing = useCallback((staffing) => {
     setData((d) => ({ ...d, staffing }));
@@ -162,6 +176,7 @@ export function useStore() {
     addEmployeesBatch,
     updateEmployee,
     deleteEmployee,
+    deleteAllEmployees,
     saveStaffing,
     setSchedule,
     assignCell,

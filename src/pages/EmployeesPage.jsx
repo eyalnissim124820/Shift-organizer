@@ -396,11 +396,12 @@ function CSVUploadModal({ onUpload, onClose }) {
   );
 }
 
-export default function EmployeesPage({ data, addEmployee, addEmployeesBatch, updateEmployee, deleteEmployee, toast }) {
+export default function EmployeesPage({ data, addEmployee, addEmployeesBatch, updateEmployee, deleteEmployee, deleteAllEmployees, toast }) {
   const [showAdd, setShowAdd] = useState(false);
   const [showCSV, setShowCSV] = useState(false);
   const [editEmp, setEditEmp] = useState(null);
   const [deleteEmp, setDeleteEmp] = useState(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
   const activeCount = data.employees.filter((e) => e.status === 'active').length;
   const shabbatCount = data.employees.filter((e) => e.shabbatKeeper).length;
@@ -418,6 +419,11 @@ export default function EmployeesPage({ data, addEmployee, addEmployeesBatch, up
             <Button variant="accent" onClick={() => setShowAdd(true)}>
               + Add Employee
             </Button>
+            {data.employees.length > 0 && (
+              <Button variant="danger" onClick={() => setConfirmDeleteAll(true)}>
+                Delete All
+              </Button>
+            )}
           </div>
         }
       />
@@ -552,6 +558,18 @@ export default function EmployeesPage({ data, addEmployee, addEmployeesBatch, up
             setDeleteEmp(null);
           }}
           onCancel={() => setDeleteEmp(null)}
+        />
+      )}
+      {confirmDeleteAll && (
+        <Confirm
+          danger
+          message={`Delete ALL ${data.employees.length} employees? They will be removed from all schedules. This cannot be undone.`}
+          onConfirm={() => {
+            deleteAllEmployees();
+            toast('All employees deleted.');
+            setConfirmDeleteAll(false);
+          }}
+          onCancel={() => setConfirmDeleteAll(false)}
         />
       )}
     </div>
