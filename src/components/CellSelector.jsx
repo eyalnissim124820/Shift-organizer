@@ -82,7 +82,7 @@ export function CellSelector({ cellKey, currentEmployeeId, activeEmployees, shif
             display: 'flex', alignItems: 'center', gap: 8,
           }}
         >
-          <span style={{ fontSize: 14 }}>\u2014</span> Unassigned
+          <span style={{ fontSize: 14 }}>—</span> Unassigned
         </button>
 
         {eligible.length === 0 && restricted.length === 0 && (
@@ -121,7 +121,7 @@ export function CellSelector({ cellKey, currentEmployeeId, activeEmployees, shif
                 )}
               </span>
               {isSelected && (
-                <span style={{ fontSize: 10, color: 'var(--accent)' }}>\u2713</span>
+                <span style={{ fontSize: 10, color: 'var(--accent)' }}>✓</span>
               )}
             </button>
           );

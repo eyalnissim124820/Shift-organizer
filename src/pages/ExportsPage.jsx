@@ -20,16 +20,16 @@ function WeekPicker({ week, onChange, schedules }) {
         <button
           onClick={() => onChange(addWeeks(week, -1))}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', fontSize: 18 }}
-        >\u2190</button>
+        >←</button>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--ink-1)', minWidth: 180 }}>
           Week of {formatWeekLabel(week)}
         </span>
         <button
           onClick={() => onChange(addWeeks(week, 1))}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', fontSize: 18 }}
-        >\u2192</button>
+        >→</button>
         {schedules[week]
-          ? <Badge color="green">\u2713 Schedule exists</Badge>
+          ? <Badge color="green">✓ Schedule exists</Badge>
           : <Badge color="muted">No schedule</Badge>
         }
       </div>
@@ -116,7 +116,7 @@ export default function ExportsPage({ data, toast }) {
             width: 48, height: 48, background: 'var(--green-bg)', borderRadius: 12,
             display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, marginBottom: 16,
           }}>
-            \uD83D\uDCCA
+            📊
           </div>
           <h3 style={{
             fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700,
@@ -144,7 +144,7 @@ export default function ExportsPage({ data, toast }) {
             width: 48, height: 48, background: 'var(--accent-bg)', borderRadius: 12,
             display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, marginBottom: 16,
           }}>
-            \uD83D\uDDBC\uFE0F
+            🖼️
           </div>
           <h3 style={{
             fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700,
@@ -169,7 +169,7 @@ export default function ExportsPage({ data, toast }) {
 
       <Card style={{ padding: 20, background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
         <p style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.7 }}>
-          <strong style={{ color: 'var(--ink-2)' }}>CSV columns:</strong> Week Start Date \u00b7 Day \u00b7 Shift Name \u00b7 Shift Hours \u00b7 Position \u00b7 Employee Name \u00b7 Employee ID \u00b7 Assignment Status
+          <strong style={{ color: 'var(--ink-2)' }}>CSV columns:</strong> Week Start Date · Day · Shift Name · Shift Hours · Position · Employee Name · Employee ID · Assignment Status
           <br />
           <strong style={{ color: 'var(--ink-2)' }}>PNG:</strong> Full schedule grid with shift headers, position labels, and employee names.
           <br />
