@@ -97,11 +97,14 @@ export function buildEmptySchedule(staffing) {
 /**
  * Generates a schedule with employees auto-allocated.
  * Rules:
- * - No 2 consecutive shifts (morning->noon, noon->night, night->morning(next day))
+ * - Random assignment among equally loaded employees
+ * - 16h minimum rest between shifts; only noon→morning(next day) exception allowed
+ * - No two shifts on the same day
  * - Shabbat keepers can't work restricted shifts
- * - Spread employees evenly
+ * - Min 2 days off per week; 3 if 2+ weekend shifts (Friday/Saturday)
+ * - Respects employee preferences; falls back to forced random if needed
  */
-export function autoAllocateSchedule(staffing, employees) {
+export function autoAllocateSchedule(staffing, employees, weekPreferences = {}) {
   const schedule = buildEmptySchedule(staffing);
   const activeEmployees = employees.filter((e) => e.status === 'active');
 
@@ -109,11 +112,13 @@ export function autoAllocateSchedule(staffing, employees) {
 
   // Track assignments per employee: { empId: Set of "dayIndex__shiftId" }
   const empAssignments = {};
-  activeEmployees.forEach((e) => { empAssignments[e.id] = new Set(); });
-
-  // Track shift count per employee for even distribution
   const empShiftCount = {};
-  activeEmployees.forEach((e) => { empShiftCount[e.id] = 0; });
+  const empDaysWorked = {};
+  activeEmployees.forEach((e) => {
+    empAssignments[e.id] = new Set();
+    empShiftCount[e.id] = 0;
+    empDaysWorked[e.id] = new Set();
+  });
 
   // Process each day+shift in chronological order
   DAYS.forEach((day, dayIndex) => {
@@ -124,31 +129,40 @@ export function autoAllocateSchedule(staffing, employees) {
       for (let p = 0; p < count; p++) {
         const key = cellKey(shift.id, p, day);
 
-        // Find eligible employees sorted by fewest assignments
-        const eligible = activeEmployees
-          .filter((emp) => {
-            // Skip Shabbat keepers for restricted shifts
-            if (shabbatRestricted && emp.shabbatKeeper) return false;
+        // Find eligible employees
+        const eligible = activeEmployees.filter((emp) => {
+          if (shabbatRestricted && emp.shabbatKeeper) return false;
+          const dayShiftKey = `${dayIndex}__${shift.id}`;
+          if (empAssignments[emp.id].has(dayShiftKey)) return false;
+          if (!canAssignWithRestRules(empAssignments[emp.id], dayIndex, shift.id)) return false;
+          if (wouldViolateDaysOff(empDaysWorked[emp.id], dayIndex, empAssignments[emp.id])) return false;
+          return true;
+        });
 
-            // Already assigned to this day+shift? (shouldn't double-assign)
-            const dayShiftKey = `${dayIndex}__${shift.id}`;
-            if (empAssignments[emp.id].has(dayShiftKey)) return false;
+        if (eligible.length === 0) continue;
 
-            // Check consecutive shift rule
-            if (!canAssignWithoutConsecutive(empAssignments[emp.id], dayIndex, shift.id)) {
-              return false;
-            }
+        // Split by preferences: prefer employees who haven't requested this slot off
+        const prefKey = `${day}__${shift.id}`;
+        const preferred = eligible.filter((emp) => {
+          const prefs = weekPreferences[emp.id];
+          return !prefs || !prefs.includes(prefKey);
+        });
+        const nonPreferred = eligible.filter((emp) => {
+          const prefs = weekPreferences[emp.id];
+          return prefs && prefs.includes(prefKey);
+        });
 
-            return true;
-          })
-          .sort((a, b) => empShiftCount[a.id] - empShiftCount[b.id]);
+        // Use preferred pool first, fallback to forced random from non-preferred
+        let pool = preferred.length > 0 ? preferred : nonPreferred;
 
-        if (eligible.length > 0) {
-          const chosen = eligible[0];
-          schedule[key] = { employeeId: chosen.id, positionLabel: `Stand ${p + 1}` };
-          empAssignments[chosen.id].add(`${dayIndex}__${shift.id}`);
-          empShiftCount[chosen.id]++;
-        }
+        // Shuffle then sort by fewest shifts (random among equal counts)
+        pool = shuffle(pool).sort((a, b) => empShiftCount[a.id] - empShiftCount[b.id]);
+
+        const chosen = pool[0];
+        schedule[key] = { employeeId: chosen.id, positionLabel: `Stand ${p + 1}` };
+        empAssignments[chosen.id].add(`${dayIndex}__${shift.id}`);
+        empShiftCount[chosen.id]++;
+        empDaysWorked[chosen.id].add(dayIndex);
       }
     });
   });
@@ -157,37 +171,88 @@ export function autoAllocateSchedule(staffing, employees) {
 }
 
 /**
- * Check if assigning an employee to dayIndex+shiftId would create consecutive shifts.
- * Consecutive means:
- * - Same day: morning then noon, or noon then night
- * - Cross-day: night of day N then morning of day N+1
+ * 16h minimum rest rule. No two shifts on the same day.
+ * Cross-day blocks: night → morning(next), night → noon(next).
+ * Exception: noon → morning(next day) is allowed (8h rest permitted).
  */
-function canAssignWithoutConsecutive(assignments, dayIndex, shiftId) {
-  const order = SHIFT_ORDER[shiftId];
-
-  // Check same day - previous shift
-  if (order > 0) {
-    const prevShiftId = FIXED_SHIFTS[order - 1].id;
-    if (assignments.has(`${dayIndex}__${prevShiftId}`)) return false;
+function canAssignWithRestRules(assignments, dayIndex, shiftId) {
+  // No two shifts on the same day
+  for (const s of FIXED_SHIFTS) {
+    if (s.id !== shiftId && assignments.has(`${dayIndex}__${s.id}`)) {
+      return false;
+    }
   }
 
-  // Check same day - next shift
-  if (order < 2) {
-    const nextShiftId = FIXED_SHIFTS[order + 1].id;
-    if (assignments.has(`${dayIndex}__${nextShiftId}`)) return false;
+  // Cross-day: after night (ends 07:00), next day morning (0h) and noon (8h) are blocked
+  if (dayIndex > 0) {
+    if ((shiftId === 'morning' || shiftId === 'noon') && assignments.has(`${dayIndex - 1}__night`)) {
+      return false;
+    }
   }
 
-  // Check cross-day: if assigning morning, check previous day's night
-  if (shiftId === 'morning' && dayIndex > 0) {
-    if (assignments.has(`${dayIndex - 1}__night`)) return false;
-  }
-
-  // Check cross-day: if assigning night, check next day's morning
-  if (shiftId === 'night' && dayIndex < 6) {
+  // Cross-day: if assigning night, next day morning and noon are blocked
+  if (dayIndex < 6 && shiftId === 'night') {
     if (assignments.has(`${dayIndex + 1}__morning`)) return false;
+    if (assignments.has(`${dayIndex + 1}__noon`)) return false;
   }
 
+  // noon → morning(next day) is the allowed exception — not blocked
   return true;
+}
+
+/**
+ * Check if assigning this day would violate days-off constraints:
+ * - Min 2 days off per week
+ * - Min 3 days off if 2+ weekend shifts (Friday/Saturday)
+ */
+function wouldViolateDaysOff(daysWorked, dayIndex, assignments) {
+  if (daysWorked.has(dayIndex)) return false; // already working this day
+
+  const projectedDaysOff = 7 - (daysWorked.size + 1);
+
+  // Count weekend shifts including the projected one
+  let weekendShifts = 0;
+  for (const key of assignments) {
+    const di = parseInt(key.split('__')[0]);
+    if (di === 5 || di === 6) weekendShifts++;
+  }
+  if (dayIndex === 5 || dayIndex === 6) weekendShifts++;
+
+  const minDaysOff = weekendShifts >= 2 ? 3 : 2;
+  return projectedDaysOff < minDaysOff;
+}
+
+/** Fisher-Yates shuffle */
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ─── DAYS OFF STATS ──────────────────────────────────────────────────────
+export function computeEmployeeDaysOff(schedule, employees) {
+  if (!schedule) return {};
+
+  // Build: empId -> Set of day names where they work
+  const empDays = {};
+  for (const [key, cell] of Object.entries(schedule)) {
+    if (!cell?.employeeId) continue;
+    const [, , day] = key.split('__');
+    if (!empDays[cell.employeeId]) empDays[cell.employeeId] = new Set();
+    empDays[cell.employeeId].add(day);
+  }
+
+  const result = {};
+  for (const emp of employees) {
+    const daysWorked = empDays[emp.id] || new Set();
+    const daysOff = 7 - daysWorked.size;
+    const weekendShifts = (daysWorked.has('Friday') ? 1 : 0) + (daysWorked.has('Saturday') ? 1 : 0);
+    result[emp.id] = { daysOff, daysWorked: daysWorked.size, weekendShifts };
+  }
+  return result;
 }
 
 // ─── EMPLOYEE DISPLAY NAME ───────────────────────────────────────────────

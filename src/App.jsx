@@ -56,6 +56,7 @@ export default function App() {
                   data={store.data}
                   setSchedule={store.setSchedule}
                   assignCell={store.assignCell}
+                  setEmployeePreferences={store.setEmployeePreferences}
                   saveData={saveData}
                   toast={toast}
                 />
