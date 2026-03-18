@@ -1,8 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   DAYS, FIXED_SHIFTS, currentWeekISO, addWeeks, formatWeekLabel,
   buildEmptySchedule, autoAllocateSchedule, cellKey, employeeDisplayName,
-  isShabbatRestricted, computeEmployeeDaysOff,
+  isShabbatRestricted, computeEmployeeDaysOff, buildPreferencesDemoCSV,
+  parsePreferencesCSV, downloadBlob,
 } from '../utils/helpers.js';
 import { Button, PageHeader, EmptyState, Confirm, Badge, Card, Modal, ModalFooter } from '../components/UI.jsx';
 import { CellSelector } from '../components/CellSelector.jsx';
@@ -59,9 +60,11 @@ function WeekNav({ week, onChange }) {
 }
 
 /* ─── PREFERENCES MODAL ──────────────────────────────────────────────────── */
-function PreferencesModal({ week, employees, preferences, onSave, onClose }) {
+function PreferencesModal({ week, employees, preferences, onSave, onClose, toast }) {
   const activeEmployees = employees.filter((e) => e.status === 'active');
   const [selectedEmpId, setSelectedEmpId] = useState(activeEmployees[0]?.id || null);
+  const fileRef = useRef();
+  const [csvStatus, setCsvStatus] = useState(null); // { type: 'success'|'error', msg }
 
   // Build local copy of all preferences for this week
   const weekPrefs = preferences[week] || {};
@@ -92,6 +95,43 @@ function PreferencesModal({ week, employees, preferences, onSave, onClose }) {
     onClose();
   };
 
+  const handleDownloadDemo = () => {
+    const csv = buildPreferencesDemoCSV();
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    downloadBlob(blob, 'preferences_template.csv');
+  };
+
+  const handleCSVUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCsvStatus(null);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = parsePreferencesCSV(ev.target.result, employees);
+        const matchedIds = Object.keys(parsed);
+        if (matchedIds.length === 0) {
+          setCsvStatus({ type: 'error', msg: 'No employees matched. Make sure Employee IDs in the CSV match your employee records.' });
+          return;
+        }
+        // Merge into local prefs
+        setLocalPrefs((prev) => {
+          const next = { ...prev };
+          for (const [empId, blocked] of Object.entries(parsed)) {
+            next[empId] = blocked;
+          }
+          return next;
+        });
+        setCsvStatus({ type: 'success', msg: `Loaded preferences for ${matchedIds.length} employee${matchedIds.length !== 1 ? 's' : ''}.` });
+      } catch {
+        setCsvStatus({ type: 'error', msg: 'Failed to parse CSV file.' });
+      }
+    };
+    reader.readAsText(file);
+    // Reset so same file can be re-uploaded
+    e.target.value = '';
+  };
+
   const selectedPrefs = localPrefs[selectedEmpId] || [];
   const prefCount = selectedPrefs.length;
 
@@ -101,6 +141,35 @@ function PreferencesModal({ week, employees, preferences, onSave, onClose }) {
         Mark shifts each employee <strong>cannot</strong> work this week.
         The auto-allocator will respect these unless no other employee is available.
       </p>
+
+      {/* CSV upload / demo download */}
+      <div style={{
+        display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16,
+        padding: '12px 16px', background: 'var(--bg-2)', borderRadius: 8,
+        border: '1px solid var(--border)',
+      }}>
+        <input ref={fileRef} type="file" accept=".csv" onChange={handleCSVUpload} style={{ display: 'none' }} />
+        <Button size="sm" variant="secondary" onClick={() => fileRef.current.click()}>
+          Upload CSV
+        </Button>
+        <Button size="sm" variant="ghost" onClick={handleDownloadDemo}>
+          Download Template
+        </Button>
+        <span style={{ fontSize: 10, color: 'var(--ink-4)', fontFamily: 'var(--font-mono)' }}>
+          Batch import all employee preferences
+        </span>
+      </div>
+      {csvStatus && (
+        <div style={{
+          padding: '8px 14px', borderRadius: 8, marginBottom: 14,
+          fontSize: 11, fontFamily: 'var(--font-mono)',
+          background: csvStatus.type === 'success' ? 'var(--green-bg)' : 'var(--red-bg)',
+          color: csvStatus.type === 'success' ? 'var(--green)' : 'var(--red)',
+          border: `1.5px solid ${csvStatus.type === 'success' ? 'var(--green)' : '#F5C6C6'}`,
+        }}>
+          {csvStatus.msg}
+        </div>
+      )}
 
       {/* Employee selector */}
       <div style={{ marginBottom: 16 }}>
@@ -564,6 +633,7 @@ export default function SchedulePage({ data, setSchedule, assignCell, setEmploye
           preferences={data.preferences || {}}
           onSave={setEmployeePreferences}
           onClose={() => setShowPrefs(false)}
+          toast={toast}
         />
       )}
 

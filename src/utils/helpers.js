@@ -255,6 +255,96 @@ export function computeEmployeeDaysOff(schedule, employees) {
   return result;
 }
 
+// ─── PREFERENCES CSV ────────────────────────────────────────────────────
+const DAY_ABBREV = { Sun: 'Sunday', Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday' };
+const SHIFT_ABBREV = { morning: 'Morning', noon: 'Noon', night: 'Night' };
+
+/** Build column headers for preferences CSV: "Sun Morning", "Sun Noon", etc. */
+function prefColumns() {
+  const cols = [];
+  for (const day of DAYS) {
+    for (const shift of FIXED_SHIFTS) {
+      cols.push({ label: `${day.slice(0, 3)} ${shift.shiftName}`, day, shiftId: shift.id });
+    }
+  }
+  return cols;
+}
+
+/** Generate a demo preferences CSV with 3 fake employees */
+export function buildPreferencesDemoCSV() {
+  const cols = prefColumns();
+  const header = ['Employee ID', 'First Name', 'Last Name', ...cols.map((c) => c.label)];
+
+  // 3 demo employees with some blocked shifts
+  const demos = [
+    { id: '1001', first: 'Yael', last: 'Levi', blocked: ['Sun__noon', 'Mon__night', 'Thu__morning'] },
+    { id: '1002', first: 'Omer', last: 'Shapira', blocked: ['Tue__night', 'Fri__noon', 'Fri__night'] },
+    { id: '1003', first: 'Noa', last: 'Ben-David', blocked: ['Sun__morning', 'Wed__noon', 'Sat__morning'] },
+  ];
+
+  const rows = [header];
+  for (const d of demos) {
+    const row = [d.id, d.first, d.last];
+    for (const col of cols) {
+      const key = `${col.day.slice(0, 3)}__${col.shiftId}`;
+      row.push(d.blocked.includes(key) ? 'X' : '');
+    }
+    rows.push(row);
+  }
+
+  return '\uFEFF' + rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+}
+
+/** Parse a preferences CSV and return { empInternalId: ["Sunday__morning", ...] } */
+export function parsePreferencesCSV(text, employees) {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) return {};
+
+  const headerCols = parseCSVLine(lines[0]);
+
+  // Map column indices to day+shift keys (skip first 1-3 columns that are employee info)
+  const colMapping = []; // { index, day, shiftId }
+  for (let i = 0; i < headerCols.length; i++) {
+    const h = headerCols[i].trim();
+    // Try to match "Sun Morning", "Mon Noon", etc.
+    for (const [abbr, fullDay] of Object.entries(DAY_ABBREV)) {
+      for (const shift of FIXED_SHIFTS) {
+        if (h.toLowerCase() === `${abbr} ${shift.shiftName}`.toLowerCase()) {
+          colMapping.push({ index: i, day: fullDay, shiftId: shift.id });
+        }
+      }
+    }
+  }
+
+  if (colMapping.length === 0) return {};
+
+  // Find the Employee ID column (first column, or column labeled "Employee ID")
+  const idColIndex = headerCols.findIndex((h) => h.trim().toLowerCase().includes('employee id'));
+  const empIdCol = idColIndex >= 0 ? idColIndex : 0;
+
+  const result = {};
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i]);
+    const csvEmpId = (cols[empIdCol] || '').trim();
+    if (!csvEmpId) continue;
+
+    // Match to internal employee by employeeId field
+    const emp = employees.find((e) => e.employeeId === csvEmpId);
+    if (!emp) continue;
+
+    const blocked = [];
+    for (const cm of colMapping) {
+      const val = (cols[cm.index] || '').trim().toLowerCase();
+      if (val && val !== '0' && val !== 'no' && val !== 'false') {
+        blocked.push(`${cm.day}__${cm.shiftId}`);
+      }
+    }
+    result[emp.id] = blocked;
+  }
+
+  return result;
+}
+
 // ─── EMPLOYEE DISPLAY NAME ───────────────────────────────────────────────
 export function employeeDisplayName(emp) {
   return `${emp.firstName} ${emp.lastName}`.trim();
