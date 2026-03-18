@@ -1,6 +1,10 @@
 import { useState, useCallback } from 'react';
-import { DAYS, currentWeekISO, addWeeks, formatWeekLabel, buildEmptySchedule, cellKey } from '../utils/helpers.js';
-import { Button, PageHeader, EmptyState, Confirm } from '../components/UI.jsx';
+import {
+  DAYS, FIXED_SHIFTS, currentWeekISO, addWeeks, formatWeekLabel,
+  buildEmptySchedule, autoAllocateSchedule, cellKey, employeeDisplayName,
+  isShabbatRestricted,
+} from '../utils/helpers.js';
+import { Button, PageHeader, EmptyState, Confirm, Badge } from '../components/UI.jsx';
 import { CellSelector } from '../components/CellSelector.jsx';
 
 /* ─── WEEK NAVIGATOR ──────────────────────────────────────────────────────── */
@@ -18,53 +22,33 @@ function WeekNav({ week, onChange }) {
       <button
         onClick={() => onChange(addWeeks(week, -1))}
         style={{
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          color: 'var(--ink-3)',
-          fontSize: 16,
-          padding: '0 4px',
-          lineHeight: 1,
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: 'var(--ink-3)', fontSize: 16, padding: '0 4px', lineHeight: 1,
         }}
       >
-        ←
+        \u2190
       </button>
       <span style={{
-        fontFamily: 'var(--font-mono)',
-        fontSize: 12,
-        fontWeight: 600,
-        color: 'var(--ink-1)',
-        minWidth: 160,
-        textAlign: 'center',
+        fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600,
+        color: 'var(--ink-1)', minWidth: 160, textAlign: 'center',
       }}>
         Week of {formatWeekLabel(week)}
       </span>
       <button
         onClick={() => onChange(addWeeks(week, 1))}
         style={{
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          color: 'var(--ink-3)',
-          fontSize: 16,
-          padding: '0 4px',
-          lineHeight: 1,
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: 'var(--ink-3)', fontSize: 16, padding: '0 4px', lineHeight: 1,
         }}
       >
-        →
+        \u2192
       </button>
       <button
         onClick={() => onChange(currentWeekISO())}
         style={{
-          background: 'var(--bg-2)',
-          border: '1px solid var(--border)',
-          borderRadius: 6,
-          padding: '4px 10px',
-          fontSize: 10,
-          fontWeight: 700,
-          color: 'var(--ink-3)',
-          cursor: 'pointer',
-          fontFamily: 'var(--font-mono)',
+          background: 'var(--bg-2)', border: '1px solid var(--border)',
+          borderRadius: 6, padding: '4px 10px', fontSize: 10, fontWeight: 700,
+          color: 'var(--ink-3)', cursor: 'pointer', fontFamily: 'var(--font-mono)',
           letterSpacing: '0.05em',
         }}
       >
@@ -75,7 +59,7 @@ function WeekNav({ week, onChange }) {
 }
 
 /* ─── SCHEDULE GRID ───────────────────────────────────────────────────────── */
-function ScheduleGrid({ shifts, schedule, employees, onAssign }) {
+function ScheduleGrid({ staffing, schedule, employees, onAssign }) {
   const [openCell, setOpenCell] = useState(null);
   const activeEmployees = employees.filter((e) => e.status === 'active');
 
@@ -88,34 +72,21 @@ function ScheduleGrid({ shifts, schedule, employees, onAssign }) {
         <thead>
           <tr style={{ background: 'var(--ink-1)' }}>
             <th style={{
-              padding: '14px 20px',
-              textAlign: 'left',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 10,
-              fontWeight: 700,
-              color: 'rgba(255,255,255,0.45)',
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              minWidth: 180,
-              position: 'sticky',
-              left: 0,
-              background: 'var(--ink-1)',
-              zIndex: 3,
-              borderRight: '1px solid rgba(255,255,255,0.08)',
+              padding: '14px 20px', textAlign: 'left',
+              fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
+              color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em',
+              textTransform: 'uppercase', minWidth: 180,
+              position: 'sticky', left: 0, background: 'var(--ink-1)',
+              zIndex: 3, borderRight: '1px solid rgba(255,255,255,0.08)',
             }}>
-              Shift / Position
+              Shift / Stand
             </th>
             {DAYS.map((day) => (
               <th key={day} style={{
-                padding: '14px 8px',
-                textAlign: 'center',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10,
-                fontWeight: 700,
-                color: 'rgba(255,255,255,0.6)',
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-                minWidth: 108,
+                padding: '14px 8px', textAlign: 'center',
+                fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
+                color: 'rgba(255,255,255,0.6)', letterSpacing: '0.06em',
+                textTransform: 'uppercase', minWidth: 108,
               }}>
                 {day.slice(0, 3)}
                 <span style={{ display: 'block', fontSize: 8, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.04em' }}>
@@ -126,13 +97,15 @@ function ScheduleGrid({ shifts, schedule, employees, onAssign }) {
           </tr>
         </thead>
         <tbody>
-          {shifts.map((shift, si) => {
-            const count = Number(shift.positionCount) || 1;
-            return Array.from({ length: count }, (_, pi) => {
-              const posLabel = shift.customPositions?.[pi]?.trim() || `Stand ${pi + 1}`;
+          {FIXED_SHIFTS.map((shift, si) => {
+            // Max positions for this shift across all days
+            const maxCount = Math.max(...DAYS.map((day) => staffing?.[day]?.[shift.id] ?? 0));
+
+            return Array.from({ length: maxCount }, (_, pi) => {
+              const posLabel = `Stand ${pi + 1}`;
               const isFirstPos = pi === 0;
-              const isLastShift = si === shifts.length - 1;
-              const isLastPos = pi === count - 1;
+              const isLastShift = si === FIXED_SHIFTS.length - 1;
+              const isLastPos = pi === maxCount - 1;
 
               return (
                 <tr
@@ -144,45 +117,52 @@ function ScheduleGrid({ shifts, schedule, employees, onAssign }) {
                 >
                   {/* Label cell */}
                   <td style={{
-                    padding: '10px 20px',
-                    position: 'sticky',
-                    left: 0,
+                    padding: '10px 20px', position: 'sticky', left: 0,
                     background: isFirstPos ? 'var(--surface-2)' : 'var(--surface)',
-                    zIndex: 1,
-                    borderRight: '1.5px solid var(--border)',
-                    verticalAlign: 'middle',
+                    zIndex: 1, borderRight: '1.5px solid var(--border)', verticalAlign: 'middle',
                   }}>
                     {isFirstPos && (
                       <div style={{ marginBottom: 2 }}>
                         <span style={{
-                          fontFamily: 'var(--font-display)',
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: 'var(--accent)',
+                          fontFamily: 'var(--font-display)', fontSize: 12,
+                          fontWeight: 700, color: 'var(--accent)',
                         }}>
                           {shift.shiftName}
                         </span>
                         <span style={{
-                          marginLeft: 8,
-                          fontSize: 10,
-                          color: 'var(--ink-3)',
+                          marginLeft: 8, fontSize: 10, color: 'var(--ink-3)',
                           fontFamily: 'var(--font-mono)',
                         }}>
-                          {shift.startTime}–{shift.endTime}
+                          {shift.startTime}-{shift.endTime}
                         </span>
                       </div>
                     )}
-                    <div style={{
-                      fontSize: 11,
-                      color: 'var(--ink-3)',
-                      fontFamily: 'var(--font-mono)',
-                    }}>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
                       {posLabel}
                     </div>
                   </td>
 
                   {/* Day cells */}
                   {DAYS.map((day) => {
+                    const dayCount = staffing?.[day]?.[shift.id] ?? 0;
+                    const isNA = pi >= dayCount;
+
+                    if (isNA) {
+                      return (
+                        <td key={day} style={{
+                          padding: '6px 6px', textAlign: 'center',
+                          verticalAlign: 'middle', background: 'var(--bg-2)',
+                        }}>
+                          <span style={{
+                            fontSize: 11, color: 'var(--ink-4)',
+                            fontFamily: 'var(--font-mono)',
+                          }}>
+                            -
+                          </span>
+                        </td>
+                      );
+                    }
+
                     const key = cellKey(shift.id, pi, day);
                     const cell = schedule[key];
                     const emp = cell?.employeeId
@@ -194,45 +174,27 @@ function ScheduleGrid({ shifts, schedule, employees, onAssign }) {
                       <td
                         key={day}
                         style={{
-                          padding: '6px 6px',
-                          textAlign: 'center',
-                          position: 'relative',
-                          verticalAlign: 'middle',
+                          padding: '6px 6px', textAlign: 'center',
+                          position: 'relative', verticalAlign: 'middle',
                         }}
                       >
                         <button
                           onClick={() => handleOpen(key)}
                           style={{
                             width: '100%',
-                            background: emp
-                              ? 'var(--accent-bg)'
-                              : 'transparent',
-                            border: `1.5px solid ${isOpen
-                              ? 'var(--accent)'
-                              : emp
-                                ? 'var(--accent-border)'
-                                : 'var(--border)'}`,
-                            borderRadius: 7,
-                            padding: '7px 6px',
-                            cursor: 'pointer',
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: 11,
+                            background: emp ? 'var(--accent-bg)' : 'transparent',
+                            border: `1.5px solid ${isOpen ? 'var(--accent)' : emp ? 'var(--accent-border)' : 'var(--border)'}`,
+                            borderRadius: 7, padding: '7px 6px', cursor: 'pointer',
+                            fontFamily: 'var(--font-mono)', fontSize: 11,
                             fontWeight: emp ? 700 : 400,
                             color: emp ? 'var(--accent)' : 'var(--ink-4)',
-                            transition: 'all 0.12s',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            maxWidth: 96,
+                            transition: 'all 0.12s', whiteSpace: 'nowrap',
+                            overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 96,
                           }}
-                          onMouseEnter={(e) => {
-                            if (!isOpen) e.currentTarget.style.borderColor = 'var(--accent)';
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isOpen) e.currentTarget.style.borderColor = emp ? 'var(--accent-border)' : 'var(--border)';
-                          }}
+                          onMouseEnter={(e) => { if (!isOpen) e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                          onMouseLeave={(e) => { if (!isOpen) e.currentTarget.style.borderColor = emp ? 'var(--accent-border)' : 'var(--border)'; }}
                         >
-                          {emp ? emp.name : '—'}
+                          {emp ? employeeDisplayName(emp) : '\u2014'}
                         </button>
 
                         {isOpen && (
@@ -240,6 +202,8 @@ function ScheduleGrid({ shifts, schedule, employees, onAssign }) {
                             cellKey={key}
                             currentEmployeeId={cell?.employeeId ?? null}
                             activeEmployees={activeEmployees}
+                            shiftId={shift.id}
+                            day={day}
                             onAssign={(empId) => onAssign(key, empId)}
                             onClose={handleClose}
                           />
@@ -263,17 +227,34 @@ export default function SchedulePage({ data, setSchedule, assignCell, saveData, 
   const [confirmRegen, setConfirmRegen] = useState(false);
 
   const schedule = data.schedules[week] || null;
-  const hasShifts = data.shifts.length > 0;
+  const staffing = data.staffing;
+  const hasStaffing = staffing && Object.keys(staffing).length > 0;
+
+  const totalPositions = hasStaffing
+    ? DAYS.reduce((total, day) =>
+        total + FIXED_SHIFTS.reduce((sum, shift) => sum + (staffing[day]?.[shift.id] ?? 0), 0), 0)
+    : 0;
 
   const generate = useCallback((force = false) => {
-    if (!hasShifts) { toast('Configure shifts in Settings first.', 'error'); return; }
+    if (!hasStaffing || totalPositions === 0) {
+      toast('Configure staffing requirements in Settings first.', 'error');
+      return;
+    }
     if (!force && schedule && Object.keys(schedule).length > 0) {
       setConfirmRegen(true);
       return;
     }
-    setSchedule(week, buildEmptySchedule(data.shifts));
-    toast('Schedule generated!');
-  }, [hasShifts, schedule, week, data.shifts, setSchedule, toast]);
+    const activeCount = data.employees.filter((e) => e.status === 'active').length;
+    let newSchedule;
+    if (activeCount > 0) {
+      newSchedule = autoAllocateSchedule(staffing, data.employees);
+      toast('Schedule generated with auto-allocation!');
+    } else {
+      newSchedule = buildEmptySchedule(staffing);
+      toast('Empty schedule generated. Add employees to enable auto-allocation.');
+    }
+    setSchedule(week, newSchedule);
+  }, [hasStaffing, totalPositions, schedule, week, staffing, data.employees, setSchedule, toast]);
 
   const handleAssign = useCallback((key, empId) => {
     assignCell(week, key, empId);
@@ -284,34 +265,39 @@ export default function SchedulePage({ data, setSchedule, assignCell, saveData, 
     toast('Schedule saved.');
   };
 
-  if (!hasShifts) {
+  if (!hasStaffing || totalPositions === 0) {
     return (
       <div className="fade-up">
         <PageHeader title="Schedule" subtitle="Weekly assignment grid" />
         <EmptyState
-          icon="⬛"
-          title="No shift settings found"
-          message="Go to Settings and configure your shift types before generating a schedule."
+          icon="\u2B1B"
+          title="No staffing configured"
+          message="Go to Settings and configure your staffing requirements before generating a schedule."
         />
       </div>
     );
   }
 
+  const assignedCount = schedule
+    ? Object.values(schedule).filter((c) => c.employeeId).length
+    : 0;
+  const totalCells = schedule ? Object.keys(schedule).length : 0;
+
   return (
     <div className="fade-up">
       <PageHeader
         title="Schedule"
-        subtitle={`${Object.values(data.schedules[week] || {}).filter((c) => c.employeeId).length} assigned · ${Object.keys(data.schedules[week] || {}).length} total cells`}
+        subtitle={`${assignedCount} assigned \u00b7 ${totalCells} total cells`}
         action={
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <WeekNav week={week} onChange={setWeek} />
             {schedule ? (
-              <Button variant="secondary" onClick={() => generate(false)}>↺ Regenerate</Button>
+              <Button variant="secondary" onClick={() => generate(false)}>\u21BA Regenerate</Button>
             ) : (
               <Button variant="accent" onClick={() => generate(false)}>Generate</Button>
             )}
             {schedule && (
-              <Button variant="primary" onClick={handleSave}>💾 Save</Button>
+              <Button variant="primary" onClick={handleSave}>Save</Button>
             )}
           </div>
         }
@@ -320,7 +306,7 @@ export default function SchedulePage({ data, setSchedule, assignCell, saveData, 
       {confirmRegen && (
         <Confirm
           danger
-          message="This week already has a schedule. Regenerating will replace ALL current assignments with an empty template. Are you sure?"
+          message="This week already has a schedule. Regenerating will replace ALL current assignments. Are you sure?"
           onConfirm={() => { setConfirmRegen(false); generate(true); }}
           onCancel={() => setConfirmRegen(false)}
         />
@@ -328,16 +314,16 @@ export default function SchedulePage({ data, setSchedule, assignCell, saveData, 
 
       {!schedule ? (
         <EmptyState
-          icon="📅"
+          icon="\uD83D\uDCC5"
           title="No schedule for this week"
-          message="Click Generate to create the weekly assignment grid based on your current shift settings."
+          message="Click Generate to create the weekly schedule with auto-allocation based on your staffing settings."
           action={
             <Button variant="accent" onClick={() => generate(false)}>Generate Schedule</Button>
           }
         />
       ) : (
         <ScheduleGrid
-          shifts={data.shifts}
+          staffing={staffing}
           schedule={schedule}
           employees={data.employees}
           onAssign={handleAssign}

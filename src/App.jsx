@@ -29,10 +29,8 @@ export default function App() {
   };
 
   const saveData = (d) => {
-    // saveData is called explicitly from schedule page — already persisted via setData,
-    // but we call persist again to be safe (no-op if unchanged)
     try {
-      localStorage.setItem('shift_organizer_v1', JSON.stringify(d));
+      localStorage.setItem('shift_organizer_v2', JSON.stringify(d));
     } catch {}
   };
 
@@ -69,6 +67,7 @@ export default function App() {
                 <EmployeesPage
                   data={store.data}
                   addEmployee={store.addEmployee}
+                  addEmployeesBatch={store.addEmployeesBatch}
                   updateEmployee={store.updateEmployee}
                   deleteEmployee={store.deleteEmployee}
                   toast={toast}
@@ -80,7 +79,7 @@ export default function App() {
               element={
                 <SettingsPage
                   data={store.data}
-                  saveShifts={store.saveShifts}
+                  saveStaffing={store.saveStaffing}
                   toast={toast}
                 />
               }

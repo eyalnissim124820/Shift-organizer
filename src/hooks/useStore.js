@@ -1,17 +1,25 @@
 import { useState, useCallback } from 'react';
+import { DEFAULT_STAFFING, uid } from '../utils/helpers.js';
 
-const STORAGE_KEY = 'shift_organizer_v1';
+const STORAGE_KEY = 'shift_organizer_v2';
 
 const DEFAULT = {
   employees: [],
-  shifts: [],
+  staffing: { ...DEFAULT_STAFFING },
   schedules: {}, // { [weekISO]: { [cellKey]: { employeeId, positionLabel } } }
 };
 
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...DEFAULT, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        ...DEFAULT,
+        ...parsed,
+        staffing: parsed.staffing || { ...DEFAULT_STAFFING },
+      };
+    }
   } catch (_) {}
   return { ...DEFAULT };
 }
@@ -34,16 +42,36 @@ export function useStore() {
   }, []);
 
   // ── EMPLOYEES ────────────────────────────────────────────────────────────
-  const addEmployee = useCallback((name) => {
+  const addEmployee = useCallback((empData) => {
     const emp = {
-      id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2),
-      name: name.trim(),
+      id: uid(),
+      firstName: empData.firstName.trim(),
+      lastName: empData.lastName.trim(),
+      employeeId: empData.employeeId.trim(),
+      phone: empData.phone.trim(),
+      shabbatKeeper: empData.shabbatKeeper || false,
       status: 'active',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     setData((d) => ({ ...d, employees: [...d.employees, emp] }));
     return emp;
+  }, [setData]);
+
+  const addEmployeesBatch = useCallback((empList) => {
+    const newEmps = empList.map((empData) => ({
+      id: uid(),
+      firstName: (empData.firstName || '').trim(),
+      lastName: (empData.lastName || '').trim(),
+      employeeId: (empData.employeeId || '').trim(),
+      phone: (empData.phone || '').trim(),
+      shabbatKeeper: empData.shabbatKeeper || false,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
+    setData((d) => ({ ...d, employees: [...d.employees, ...newEmps] }));
+    return newEmps;
   }, [setData]);
 
   const updateEmployee = useCallback((id, patch) => {
@@ -57,7 +85,6 @@ export function useStore() {
 
   const deleteEmployee = useCallback((id) => {
     setData((d) => {
-      // Clear from all schedules
       const schedules = Object.fromEntries(
         Object.entries(d.schedules).map(([wk, sched]) => [
           wk,
@@ -73,9 +100,9 @@ export function useStore() {
     });
   }, [setData]);
 
-  // ── SHIFTS ───────────────────────────────────────────────────────────────
-  const saveShifts = useCallback((shifts) => {
-    setData((d) => ({ ...d, shifts }));
+  // ── STAFFING ───────────────────────────────────────────────────────────
+  const saveStaffing = useCallback((staffing) => {
+    setData((d) => ({ ...d, staffing }));
   }, [setData]);
 
   // ── SCHEDULES ────────────────────────────────────────────────────────────
@@ -113,8 +140,10 @@ export function useStore() {
       reader.onload = (e) => {
         try {
           const parsed = JSON.parse(e.target.result);
-          if (!parsed.employees || !parsed.shifts || !parsed.schedules)
+          if (!parsed.employees || !parsed.schedules)
             throw new Error('Invalid format');
+          // Ensure staffing exists
+          if (!parsed.staffing) parsed.staffing = { ...DEFAULT_STAFFING };
           setData(parsed);
           resolve();
         } catch (err) {
@@ -130,9 +159,10 @@ export function useStore() {
     data,
     setData,
     addEmployee,
+    addEmployeesBatch,
     updateEmployee,
     deleteEmployee,
-    saveShifts,
+    saveStaffing,
     setSchedule,
     assignCell,
     exportJSON,
