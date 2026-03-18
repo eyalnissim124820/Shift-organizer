@@ -424,7 +424,7 @@ export default function EmployeesPage({ data, addEmployee, addEmployeesBatch, up
 
       {data.employees.length === 0 ? (
         <EmptyState
-          icon="\u25C8"
+          icon="◈"
           title="No employees yet"
           message="Add your first team member to start building schedules."
           action={

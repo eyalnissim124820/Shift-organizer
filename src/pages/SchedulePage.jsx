@@ -26,7 +26,7 @@ function WeekNav({ week, onChange }) {
           color: 'var(--ink-3)', fontSize: 16, padding: '0 4px', lineHeight: 1,
         }}
       >
-        \u2190
+        ←
       </button>
       <span style={{
         fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600,
@@ -41,7 +41,7 @@ function WeekNav({ week, onChange }) {
           color: 'var(--ink-3)', fontSize: 16, padding: '0 4px', lineHeight: 1,
         }}
       >
-        \u2192
+        →
       </button>
       <button
         onClick={() => onChange(currentWeekISO())}
@@ -270,7 +270,7 @@ export default function SchedulePage({ data, setSchedule, assignCell, saveData, 
       <div className="fade-up">
         <PageHeader title="Schedule" subtitle="Weekly assignment grid" />
         <EmptyState
-          icon="\u2B1B"
+          icon="⬛"
           title="No staffing configured"
           message="Go to Settings and configure your staffing requirements before generating a schedule."
         />
@@ -292,7 +292,7 @@ export default function SchedulePage({ data, setSchedule, assignCell, saveData, 
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <WeekNav week={week} onChange={setWeek} />
             {schedule ? (
-              <Button variant="secondary" onClick={() => generate(false)}>\u21BA Regenerate</Button>
+              <Button variant="secondary" onClick={() => generate(false)}>↺ Regenerate</Button>
             ) : (
               <Button variant="accent" onClick={() => generate(false)}>Generate</Button>
             )}
@@ -314,7 +314,7 @@ export default function SchedulePage({ data, setSchedule, assignCell, saveData, 
 
       {!schedule ? (
         <EmptyState
-          icon="\uD83D\uDCC5"
+          icon="📅"
           title="No schedule for this week"
           message="Click Generate to create the weekly schedule with auto-allocation based on your staffing settings."
           action={
