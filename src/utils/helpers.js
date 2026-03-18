@@ -196,34 +196,68 @@ export function employeeDisplayName(emp) {
 }
 
 // ─── CSV EXPORT ──────────────────────────────────────────────────────────
+const HEBREW_DAYS = {
+  Sunday: "\u05D9\u05D5\u05DD \u05D0'",
+  Monday: "\u05D9\u05D5\u05DD \u05D1'",
+  Tuesday: "\u05D9\u05D5\u05DD \u05D2'",
+  Wednesday: "\u05D9\u05D5\u05DD \u05D3'",
+  Thursday: "\u05D9\u05D5\u05DD \u05D4'",
+  Friday: "\u05D9\u05D5\u05DD \u05D5'",
+  Saturday: "\u05D9\u05D5\u05DD \u05E9\u05D1\u05EA",
+};
+
+const HEBREW_SHIFTS = {
+  morning: '\u05D1\u05D5\u05E7\u05E8',
+  noon: '\u05E6\u05D4\u05E8\u05D9\u05D9\u05DD',
+  night: '\u05DC\u05D9\u05DC\u05D4',
+};
+
+const HEBREW_OFF = '\u05D7\u05D5\u05E4\u05E9';
+
 export function buildCSV(weekStart, staffing, schedule, employees) {
-  const rows = [
-    ['Week Start Date', 'Day', 'Shift Name', 'Shift Hours', 'Position', 'Employee Name', 'Employee ID', 'Assignment Status'],
-  ];
-  FIXED_SHIFTS.forEach((shift) => {
-    DAYS.forEach((day) => {
-      const count = staffing?.[day]?.[shift.id] ?? 0;
-      for (let pi = 0; pi < count; pi++) {
-        const posLabel = `Stand ${pi + 1}`;
-        const k = cellKey(shift.id, pi, day);
-        const cell = schedule?.[k];
-        const emp = cell?.employeeId
-          ? employees.find((e) => e.id === cell.employeeId)
-          : null;
-        rows.push([
-          weekStart,
-          day,
-          shift.shiftName,
-          `${shift.startTime}-${shift.endTime}`,
-          posLabel,
-          emp ? employeeDisplayName(emp) : '',
-          emp ? emp.employeeId : '',
-          emp ? 'Assigned' : 'Unassigned',
-        ]);
-      }
-    });
+  const startDate = new Date(weekStart + 'T00:00:00');
+
+  // Build day headers with dates: "יום א' - DD.M"
+  const dayHeaders = DAYS.map((day, i) => {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + i);
+    const dateStr = `${d.getDate()}.${d.getMonth() + 1}`;
+    return `${HEBREW_DAYS[day]} - ${dateStr}`;
   });
-  return rows
+
+  const header = [
+    '\u05DE\u05E1\u05E4\u05E8 \u05D0\u05D9\u05E9\u05D9',
+    '\u05E9\u05DD \u05E4\u05E8\u05D8\u05D9',
+    '\u05E9\u05DD \u05DE\u05E9\u05E4\u05D7\u05D4',
+    '\u05D8\u05DC\u05E4\u05D5\u05DF',
+    ...dayHeaders,
+  ];
+
+  // Build a lookup: empInternalId -> { day -> [shiftIds] }
+  const empShifts = {};
+  if (schedule) {
+    for (const [key, cell] of Object.entries(schedule)) {
+      if (!cell?.employeeId) continue;
+      const [shiftId, , day] = key.split('__');
+      if (!empShifts[cell.employeeId]) empShifts[cell.employeeId] = {};
+      if (!empShifts[cell.employeeId][day]) empShifts[cell.employeeId][day] = new Set();
+      empShifts[cell.employeeId][day].add(shiftId);
+    }
+  }
+
+  const rows = [header];
+  for (const emp of employees) {
+    const shifts = empShifts[emp.id] || {};
+    const dayCols = DAYS.map((day) => {
+      const dayShifts = shifts[day];
+      if (!dayShifts || dayShifts.size === 0) return HEBREW_OFF;
+      return [...dayShifts].map((s) => HEBREW_SHIFTS[s] || s).join(' + ');
+    });
+    rows.push([emp.employeeId, emp.firstName, emp.lastName, emp.phone || '', ...dayCols]);
+  }
+
+  // BOM for Excel Hebrew support + CSV content
+  return '\uFEFF' + rows
     .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
     .join('\n');
 }

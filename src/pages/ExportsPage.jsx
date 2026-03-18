@@ -169,7 +169,7 @@ export default function ExportsPage({ data, toast }) {
 
       <Card style={{ padding: 20, background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
         <p style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.7 }}>
-          <strong style={{ color: 'var(--ink-2)' }}>CSV columns:</strong> Week Start Date · Day · Shift Name · Shift Hours · Position · Employee Name · Employee ID · Assignment Status
+          <strong style={{ color: 'var(--ink-2)' }}>CSV columns:</strong> Employee ID · First Name · Last Name · Phone · Shift per day (Morning/Noon/Night/Off) for each day of the week
           <br />
           <strong style={{ color: 'var(--ink-2)' }}>PNG:</strong> Full schedule grid with shift headers, position labels, and employee names.
           <br />
