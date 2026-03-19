@@ -350,6 +350,18 @@ export function employeeDisplayName(emp) {
   return `${emp.firstName} ${emp.lastName}`.trim();
 }
 
+// ─── EMPLOYEE CSV DEMO ──────────────────────────────────────────────────
+export function buildEmployeeDemoCSV() {
+  const header = ['First Name', 'Last Name', 'Employee ID', 'Phone', 'Shabbat Keeper'];
+  const demos = [
+    ['Yael', 'Levi', '1001', '050-1234567', 'false'],
+    ['Omer', 'Shapira', '1002', '052-9876543', 'true'],
+    ['Noa', 'Ben-David', '1003', '054-5551234', 'false'],
+  ];
+  const rows = [header, ...demos];
+  return '\uFEFF' + rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+}
+
 // ─── CSV EXPORT ──────────────────────────────────────────────────────────
 const HEBREW_DAYS = {
   Sunday: "\u05D9\u05D5\u05DD \u05D0'",
