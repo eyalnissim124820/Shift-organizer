@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { parseEmployeeCSV, employeeDisplayName } from '../utils/helpers.js';
+import { parseEmployeeCSV, employeeDisplayName, buildEmployeeDemoCSV, downloadBlob } from '../utils/helpers.js';
 import {
   Button, Input, Field, Badge, Card, PageHeader,
   EmptyState, Modal, Confirm, ModalFooter,
@@ -291,7 +291,7 @@ function CSVUploadModal({ onUpload, onClose }) {
         The first row can be a header (auto-detected).
       </p>
 
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16 }}>
         <input
           ref={fileRef}
           type="file"
@@ -301,6 +301,13 @@ function CSVUploadModal({ onUpload, onClose }) {
         />
         <Button variant="secondary" onClick={() => fileRef.current.click()}>
           Choose CSV File
+        </Button>
+        <Button variant="ghost" onClick={() => {
+          const csv = buildEmployeeDemoCSV();
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+          downloadBlob(blob, 'employees_template.csv');
+        }}>
+          Download Template
         </Button>
       </div>
 
